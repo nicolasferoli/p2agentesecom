@@ -3,10 +3,8 @@ import { cookies } from 'next/headers';
 import { Database } from '@/shared/types/database.types';
 import { UserData } from '@/shared/types/supabase';
 
-// Usando tipagem mais simples por enquanto
+// Simplificado para contornar os problemas de tipagem
 export function createClient() {
-  const cookieStore = cookies();
-  
   // @ts-ignore - Ignorando erros de tipagem por enquanto
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,21 +12,19 @@ export function createClient() {
     {
       cookies: {
         get(name: string) {
-          return cookieStore.get(name)?.value;
+          return cookies().get(name)?.value;
         },
         set(name: string, value: string, options: any) {
           try {
-            cookieStore.set({ name, value, ...options });
+            cookies().set(name, value, options);
           } catch (error) {
-            // Fallback para quando cookies.set não estiver disponível (em alguns contextos do Next.js)
             console.warn('Não foi possível definir o cookie:', name);
           }
         },
         remove(name: string, options: any) {
           try {
-            cookieStore.set({ name, value: '', ...options, maxAge: 0 });
+            cookies().set({ name, value: '', ...options, maxAge: 0 });
           } catch (error) {
-            // Fallback para quando cookies.set não estiver disponível (em alguns contextos do Next.js)
             console.warn('Não foi possível remover o cookie:', name);
           }
         },
