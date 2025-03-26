@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Agentes ECOM
 
-## Getting Started
+Plataforma completa para gerenciamento e implementação de agentes de IA, oferecendo controle total sobre o ciclo de vida desde a criação até o monitoramento e otimização contínua.
 
-First, run the development server:
+## Recursos Principais
+
+- **Agentes Virtuais**: Crie e configure agentes de IA com diferentes modelos e personalização
+- **Gerenciamento de Conhecimento**: Upload e processamento de documentos, extração de informações
+- **Fluxos de Trabalho**: Criação de workflows visuais para automação e integração
+- **Prompts e Templates**: Biblioteca de templates para diferentes casos de uso
+- **Chat e Interações**: Interface de chat para interação com agentes
+- **Administração**: Gerenciamento de usuários, configurações e segurança
+- **API e Integrações**: API REST completa e integrações com serviços externos
+- **Análise e Métricas**: Dashboard com métricas de uso e desempenho
+
+## Tecnologias Utilizadas
+
+- Next.js 14 com App Router
+- React
+- TypeScript
+- Supabase (Auth, Database)
+- Tailwind CSS
+- Shadcn UI
+- Zod
+- React Hook Form
+
+## Requisitos
+
+- Node.js 18.17 ou superior
+- NPM 9 ou superior
+- Um projeto Supabase
+
+## Configuração
+
+1. Clone o repositório
+
+```bash
+git clone https://github.com/seu-usuario/agentes-ecom.git
+cd agentes-ecom
+```
+
+2. Instale as dependências
+
+```bash
+npm install
+```
+
+3. Configure as variáveis de ambiente
+
+Copie o arquivo `.env.local.example` para `.env.local` e preencha as variáveis necessárias:
+
+```bash
+cp .env.local.example .env.local
+```
+
+4. Inicie o servidor de desenvolvimento
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+A aplicação estará disponível em [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Configuração do Supabase
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Crie um projeto no [Supabase](https://supabase.com)
+2. Adicione as variáveis do Supabase ao seu `.env.local`
+3. Execute o script SQL para criar as tabelas necessárias (disponível em `supabase/schema.sql`)
 
-## Learn More
+## Estrutura do Projeto
 
-To learn more about Next.js, take a look at the following resources:
+```
+project/
+├── app/                # Diretório raiz do Next.js (usando o App Router)
+│   ├── (auth)/         # Rotas de autenticação 
+│   ├── (dashboard)/    # Rotas protegidas do dashboard
+│   ├── api/            # Rotas da API Next.js
+│   ├── components/     # Componentes React da aplicação
+│   └── ...
+├── components/         # Componentes React compartilhados
+├── lib/                # Bibliotecas e utilitários
+├── shared/             # Código compartilhado entre server e client
+│   └── types/          # Tipos TypeScript compartilhados
+├── public/             # Arquivos estáticos
+└── ...
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Licença
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[MIT](LICENSE)
