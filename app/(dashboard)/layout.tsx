@@ -1,15 +1,15 @@
 import { redirect } from "next/navigation";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/header";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { getCurrentUserFromServerComponent } from "@/lib/supabase/server";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Verificar autenticação do usuário
-  const user = await getCurrentUser();
+  // Verificar autenticação do usuário usando a função específica para Server Components
+  const user = await getCurrentUserFromServerComponent();
 
   // Redirecionar para login se não estiver autenticado
   if (!user) {

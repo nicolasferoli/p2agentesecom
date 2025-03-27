@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -24,9 +24,21 @@ import { toast } from "sonner";
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isResendingEmail, setIsResendingEmail] = useState(false);
+  const [emailForResend, setEmailForResend] = useState<string | null>(null);
+  
+  // Verificar se existe erro na URL
+  useEffect(() => {
+    const error = searchParams.get('error');
+    if (error) {
+      setErrorMessage(decodeURIComponent(error));
+    }
+  }, [searchParams]);
   
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -36,26 +48,90 @@ export default function LoginPage() {
     },
   });
 
-  async function onSubmit(data: LoginFormValues) {
-    setIsLoading(true);
+  async function handleResendConfirmation() {
+    if (!emailForResend) return;
+    
+    setIsResendingEmail(true);
     
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
+      
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: emailForResend,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      
+      if (error) {
+        console.error("Erro ao reenviar email:", error);
+        toast.error("Não foi possível reenviar o email de confirmação.");
+      } else {
+        toast.success("Email de confirmação reenviado com sucesso. Verifique sua caixa de entrada.");
+      }
+    } catch (error) {
+      console.error("Erro ao reenviar confirmação:", error);
+      toast.error("Falha ao reenviar email de confirmação.");
+    } finally {
+      setIsResendingEmail(false);
+    }
+  }
+
+  async function onSubmit(data: LoginFormValues) {
+    setIsLoading(true);
+    setErrorMessage(null);
+    setEmailForResend(null);
+    
+    try {
+      console.log("Iniciando processo de login...");
+      const supabase = createClient();
+      
+      // Tenta fazer login
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
       });
 
       if (error) {
+        // Verificar se é o erro específico de email não confirmado
+        if (error.message?.includes("Email not confirmed")) {
+          console.error("Email não confirmado:", error);
+          
+          // Salvar o email para potencial reenvio
+          setEmailForResend(data.email);
+          
+          // Exibir uma mensagem mais amigável para o usuário
+          const confirmMessage = "Seu email ainda não foi confirmado. Verifique sua caixa de entrada ou clique no botão abaixo para reenviar o email de confirmação.";
+          setErrorMessage(confirmMessage);
+          return;
+        }
+        
+        console.error("Erro na autenticação:", error);
         throw error;
       }
 
+      // Verificar se o usuário está realmente logado
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        console.error("Erro ao obter usuário após login:", userError);
+        throw new Error("Não foi possível verificar sua identidade após o login.");
+      }
+      
+      console.log("Login bem-sucedido para:", user.email);
       toast.success("Login realizado com sucesso!");
-      router.push("/dashboard");
-      router.refresh();
+      
+      // Aguarda um momento antes de redirecionar para garantir que os cookies sejam definidos
+      setTimeout(() => {
+        router.push("/dashboard");
+        router.refresh();
+      }, 500);
     } catch (error: any) {
-      console.error("Erro no login:", error);
-      toast.error(error.message || "Falha ao fazer login. Verifique suas credenciais.");
+      console.error("Erro detalhado no login:", error);
+      const message = error.message || "Falha ao fazer login. Verifique suas credenciais.";
+      setErrorMessage(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -99,6 +175,25 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
+              {errorMessage && (
+                <div className="text-sm font-medium text-destructive">
+                  {errorMessage}
+                  
+                  {emailForResend && (
+                    <div className="mt-2">
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        className="w-full mt-2" 
+                        onClick={handleResendConfirmation}
+                        disabled={isResendingEmail}
+                      >
+                        {isResendingEmail ? "Reenviando..." : "Reenviar Email de Confirmação"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Entrando..." : "Entrar"}
               </Button>
@@ -120,5 +215,21 @@ export default function LoginPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="w-full max-w-md p-8">
+          <div className="flex justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+          </div>
+        </Card>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 } 

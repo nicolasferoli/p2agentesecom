@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,9 +24,16 @@ import { toast } from "sonner";
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isDev, setIsDev] = useState(false);
+  
+  // Detectar ambiente de desenvolvimento
+  useEffect(() => {
+    setIsDev(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  }, []);
   
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -40,29 +47,76 @@ export default function RegisterPage() {
 
   async function onSubmit(data: RegisterFormValues) {
     setIsLoading(true);
+    setErrorMessage(null);
     
     try {
+      console.log("Iniciando processo de registro...");
       const supabase = createClient();
       
-      const { error } = await supabase.auth.signUp({
+      // Em desenvolvimento, podemos desativar o email de confirmação
+      const options = isDev 
+        ? {
+            data: { name: data.name },
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            // Em desenvolvimento, não exigir confirmação de email
+            emailConfirmationEnabled: false
+          }
+        : {
+            data: { name: data.name },
+            emailRedirectTo: `${window.location.origin}/auth/callback`
+          };
+      
+      const { data: authData, error } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
-        options: {
-          data: {
-            name: data.name,
-          },
-        },
+        options
       });
 
       if (error) {
+        console.error("Erro no registro:", error);
         throw error;
       }
 
-      toast.success("Conta criada com sucesso! Verifique seu e-mail para confirmar o cadastro.");
-      router.push("/login");
+      console.log("Resultado do registro:", authData);
+      
+      // Verifica se o usuário foi criado ou se o email de confirmação foi enviado
+      if (authData?.user) {
+        console.log("Usuário criado com ID:", authData.user.id);
+        
+        if (isDev && !authData.session) {
+          // Em ambiente de desenvolvimento, tentamos fazer login automaticamente
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email: data.email,
+            password: data.password
+          });
+          
+          if (signInError) {
+            console.warn("Não foi possível fazer login automático:", signInError);
+            toast.success("Conta criada com sucesso! Você precisa fazer login manualmente.");
+            setTimeout(() => router.push("/login"), 500);
+          } else {
+            toast.success("Conta criada e login automático realizado com sucesso!");
+            setTimeout(() => router.push("/dashboard"), 500);
+          }
+        } else {
+          toast.success("Conta criada com sucesso! Verifique seu e-mail para confirmar o cadastro.");
+          setTimeout(() => router.push("/login"), 500);
+        }
+      } else {
+        toast.info("Verifique seu e-mail para concluir o cadastro.");
+        setTimeout(() => router.push("/login"), 500);
+      }
     } catch (error: any) {
-      console.error("Erro no registro:", error);
-      toast.error(error.message || "Falha ao criar conta. Por favor, tente novamente.");
+      console.error("Erro detalhado no registro:", error);
+      let message = "Falha ao criar conta. Por favor, tente novamente.";
+      
+      // Mensagens de erro personalizadas com base no código de erro
+      if (error.message?.includes("email already")) {
+        message = "Este e-mail já está em uso. Tente fazer login ou recuperar sua senha.";
+      }
+      
+      setErrorMessage(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -75,6 +129,11 @@ export default function RegisterPage() {
           <CardTitle className="text-2xl font-bold">Criar conta</CardTitle>
           <CardDescription>
             Preencha os dados abaixo para criar sua conta
+            {isDev && (
+              <span className="block mt-1 text-xs text-amber-500">
+                Modo de desenvolvimento: confirmação de email desativada
+              </span>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -132,6 +191,11 @@ export default function RegisterPage() {
                   </FormItem>
                 )}
               />
+              {errorMessage && (
+                <div className="text-sm font-medium text-destructive">
+                  {errorMessage}
+                </div>
+              )}
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Criando conta..." : "Criar conta"}
               </Button>
@@ -148,5 +212,21 @@ export default function RegisterPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="w-full max-w-md p-8">
+          <div className="flex justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+          </div>
+        </Card>
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 } 

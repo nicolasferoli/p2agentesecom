@@ -1,60 +1,79 @@
 import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { Database } from '@/shared/types/database.types';
 import { UserData } from '@/shared/types/supabase';
 
-// Simplificado para contornar os problemas de tipagem
-export function createClient() {
-  // @ts-ignore - Ignorando erros de tipagem por enquanto
-  return createServerClient(
+// Define uma função para criar o cliente Supabase sem depender de cookies
+export function createClientWithoutCookies() {
+  return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookies().get(name)?.value;
-        },
-        set(name: string, value: string, options: any) {
-          try {
-            cookies().set(name, value, options);
-          } catch (error) {
-            console.warn('Não foi possível definir o cookie:', name);
-          }
-        },
-        remove(name: string, options: any) {
-          try {
-            cookies().set({ name, value: '', ...options, maxAge: 0 });
-          } catch (error) {
-            console.warn('Não foi possível remover o cookie:', name);
-          }
-        },
+        get: () => undefined,
+        set: () => {},
+        remove: () => {},
       },
     }
   );
 }
 
-export async function getCurrentUser(): Promise<UserData | null> {
-  const supabase = createClient();
-  
+// Cria um cliente Supabase para uso específico no App Router onde cookies são necessários
+export async function createClient() {
+  // Importa cookies() apenas no lado do servidor e dentro da função
   try {
-    const { data, error } = await supabase.auth.getUser();
+    // Usando import dinâmico para carregar o módulo next/headers
+    const headers = await import('next/headers');
+    const cookieStore = await headers.cookies();
     
-    if (error || !data?.user) {
+    return createServerClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get: async (name: string) => {
+            // Fazemos uma verificação simples para garantir
+            return cookieStore.get(name)?.value;
+          },
+          set: async (name: string, value: string, options: any = {}) => {
+            cookieStore.set({ name, value, ...options });
+          },
+          remove: async (name: string, options: any = {}) => {
+            cookieStore.set({ name, value: '', ...options });
+          },
+        },
+      }
+    );
+  } catch (error) {
+    console.warn('cookies() não disponível, usando cliente sem cookies', error);
+    return createClientWithoutCookies();
+  }
+}
+
+// Função para App Router (Server Components) - usa await para garantir operações assíncronas
+export async function getCurrentUserFromServerComponent(): Promise<UserData | null> {
+  try {
+    const supabase = await createClient();
+    
+    // Obter o usuário atual
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user) {
       return null;
     }
-    
-    const user = data.user;
-    
-    // Como solução temporária, vamos retornar apenas os dados básicos do usuário
-    return {
-      id: user.id,
-      email: user.email!,
-      role: 'user', // Valor padrão
-      name: user.user_metadata?.name,
-      avatar_url: user.user_metadata?.avatar_url,
-    };
+
+    // Obter detalhes do usuário no banco de dados
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', data.user.id)
+      .single();
+
+    if (userError || !userData) {
+      return null;
+    }
+
+    return userData as UserData;
   } catch (error) {
-    console.error('Erro ao buscar usuário:', error);
+    console.error('Erro ao obter usuário:', error);
     return null;
   }
 } 

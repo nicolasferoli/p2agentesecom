@@ -1,9 +1,14 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { getCurrentUserFromServerComponent } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { Bot, Database, FileText, MessageSquare, GitBranch } from "lucide-react";
 
 export default async function DashboardPage() {
-  const user = await getCurrentUser();
+  const user = await getCurrentUserFromServerComponent();
+
+  if (!user) {
+    redirect("/login");
+  }
 
   return (
     <div className="space-y-8">
